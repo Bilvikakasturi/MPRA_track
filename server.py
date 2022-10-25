@@ -10,6 +10,8 @@ import random
 from datetime import datetime
 import flask
 import logging
+
+from biomart import BiomartServer
 from flask import Flask, render_template, request, redirect, current_app, send_file, abort, after_this_request
 from werkzeug.utils import secure_filename, send_from_directory
 import pandas as pd
@@ -62,15 +64,14 @@ def upload_file():
         logging.info("Process started")
         try:
             snp_select_itr_enh(file_name, utr_enh, true_value, X)
-            if utr_enh=='BothUE':
-                snp_select_itr_enh(file_name, "UTR", true_value, X,1)
+            if utr_enh == 'BothUE':
+                snp_select_itr_enh(file_name, "UTR", true_value, X, 1)
 
         except Exception as e:
             logging.error(e)
-            with ZipFile("SUD_files.zip", "w") as newzip:
-                logging.info("The program has stopped abruptly and encountered an error:")
-                logging.info(e)
-                newzip.write('log.txt')
+            logging.info("The program has stopped abruptly and encountered an error:")
+            logging.info(e)
+            SudZipWrite()
         else:
             # pass
             logging.info("The program executed sucessfully")
@@ -104,6 +105,7 @@ def download_files():
         except Exception as error:
             app.logger.error("Error removing or closing downloaded file handle", error)
         return response
+
     return send_file('SUD_files.zip',
                      mimetype='zip',
                      attachment_filename='SUD_files.zip',
@@ -114,8 +116,9 @@ def convert_bool_str(list):
     return ''.join(chr(ord('A') + i) if b else ' ' for i, b in enumerate(list))
 
 
-def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
-
+def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
+    server = BiomartServer("http://uswest.ensembl.org/biomart")
+    hsapiens = server.databases['ENSEMBL_MART_SNP'].datasets['hsapiens_snp']
     RSID_values = request.form.get("RSID")
     rsquare = float(request.form.get("r2"))
     data_rsid = RSID_values.split()
@@ -134,7 +137,7 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
     flank = request.form.get("flank")
     flankEnh = request.form.get("flankEnh")
     if flank:
-        flank=int(flank)
+        flank = int(flank)
     p1 = request.form.get("p1")
     p2 = request.form.get("p2")
     p1Enh = request.form.get("p1Enh")
@@ -165,13 +168,13 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
             flank = int(flankEnh)
             p1 = p1Enh
             p2 = p2Enh
-            Differ=DifferEnh
-    print("values are",p1,p2,flank,utr_or_enhance)
+            Differ = DifferEnh
+    print("values are", p1, p2, flank, utr_or_enhance)
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     print("Current Time =", current_time)
     if Differ or DifferEnh:
-        flag=0
+        flag = 0
     if not flag:
         opt_file_path = "CUD_01_snp_lds.txt"
         output_file = open(opt_file_path, "w")
@@ -196,6 +199,10 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
                 x = line.split()
                 if x[0] in unique_snp:
                     output_file.write(line)
+                    unique_snp.remove(x[0])
+                if not unique_snp:
+                    output_file.close()
+                    break
 
         def convert_lst_string(s):
             for ele in s:
@@ -208,10 +215,8 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
         # merged_df = pd.merge(data_1, data_2, on=['Lead_SNP'], how='inner')
         # merged_df = merged_df[['Lead_SNP', 'b']]
         if os.stat('CUD_01_snp_lds.txt').st_size == 0:
-            with ZipFile("SUD_files.zip", "w") as newzip:
-                logging.info("The rsid's provided doesnot return any data please check and provide new rsid values")
-                newzip.write('log.txt')
-                return
+            logging.info("The rsid's provided doesnot return any data please check and provide new rsid values")
+            SudZipWrite()
         merged_df = pd.read_csv('CUD_01_snp_lds.txt', header=None, sep='\t')
         merged_df.columns = ['Lead_SNP', 'b']
         final_SNP_list = []
@@ -237,8 +242,6 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
         Lead_SNP = merged_df_copy['Lead_SNP']
         headers = ['Lead_SNP']
 
-
-
         def extract_bedfiles_fromSNP():
             global x
             with open('my_rsids.txt', 'w') as output_file:
@@ -260,14 +263,42 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
                                'output_my_rsids_location.txt '
         os.system(big_bed_tools_output)
         file_path = 'output_my_rsids_location.txt'
+
         if os.stat(file_path).st_size == 0:
             logging.info("Error in the SNP files input not given correctly, locations of the SNP's not found")
+            SudZipWrite()
+            return
         else:
             logging.info("BedNameditems location files created succesfully")
         output_rsids = pd.read_csv('output_my_rsids_location.txt', sep='\t', header=None)
         first_4_columns = output_rsids.iloc[:, :4]
-        new_4_rsids = first_4_columns
-        new_4_rsids.columns = ['CHR', 'min_range', 'max_range', 'SNP']
+        first_4_columns.columns = ['CHR', 'min_range', 'max_range', 'SNP']
+        onlyrsids = pd.read_csv('my_rsids.txt', sep='\t', header=None)
+        onlyrsids = onlyrsids.drop_duplicates().reset_index(drop=True)
+        onlyrsids.columns = ['SNP']
+        unique_vals = onlyrsids[~onlyrsids.SNP.isin(first_4_columns.SNP)].append(
+            first_4_columns[~first_4_columns.SNP.isin(onlyrsids.SNP)],
+            ignore_index=True)['SNP'].to_list()
+        response = hsapiens.search({
+            'filters': {'snp_synonym_filter': unique_vals},
+            'attributes': ['chr_name', 'chrom_start', 'chrom_end', 'synonym_name']
+        })
+        # 'synonym_name',
+        llist = []
+        for line in response.iter_lines():
+            x = (line.decode())
+            llist.append(x.split())
+        print(llist)
+        biomart_op = pd.DataFrame(llist,
+                                  columns=['CHR', 'min_range', 'max_range', 'SNP'])
+        print(biomart_op)
+        biomart_snp = biomart_op.groupby('SNP').agg(
+            {'CHR': 'min', 'min_range': 'min', 'max_range': 'max'}).reset_index()
+        biomart_snp['CHR'] = 'chr' + biomart_op['CHR'].astype(str)
+        biomart_snp = biomart_snp[['CHR', 'min_range', 'max_range', 'SNP']]
+        print(biomart_snp)
+        new_4_rsids = first_4_columns.append(biomart_snp, ignore_index=True)
+        new_4_rsids = new_4_rsids.astype({'min_range': 'int', 'max_range': 'int'})
         i = (new_4_rsids[new_4_rsids.CHR.str.contains(r'[_]')]).index
         new_4_rsids = new_4_rsids.drop(labels=i, axis=0)
         opt_rsids = pd.read_csv('drop_b.txt', sep=' ', header=None)
@@ -287,8 +318,7 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
 
         def extr_Chr_min_max(Differ):
             global f, i
-            server = BiomartServer("http://useast.ensembl.org/biomart")
-            hsapiens = server.databases['ENSEMBL_MART_SNP'].datasets['hsapiens_snp']
+
             for j in value:
                 minimum_range_list = []
                 maximum_range_list = []
@@ -298,12 +328,11 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
                     main_min_range = (new_4_rsids['min_range'].loc[new_4_rsids['SNP'] == val[0]].values.tolist()[0])
                     main_max_range = (new_4_rsids['max_range'].loc[new_4_rsids['SNP'] == val[0]].values.tolist()[0])
                 except Exception as x:
-                    response = hsapiens.search({
-                        'filters': {'snp_synonym_filter': val[0]},
-                        'attributes': ['refsnp_id']
-                    })
+
                     main_min_range = 'empty'
                     main_max_range = 'empty'
+                print(main_min_range)
+                print(main_max_range)
                 assign_min_max_chr(f, maximum_range_list, minimum_range_list, val)
 
                 chr_range_lis.append(f)
@@ -329,7 +358,6 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
                         every_line = main_min_range - Differ
                 every_line_list.append(every_line)
                 every_line_list_max.append(every_line_max)
-
 
         def assign_min_max_chr(f, maximum_range_list, minimum_range_list, val):
             for x in val:
@@ -370,6 +398,7 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
     def sum_true(row):
         row1 = sum(row)
         return row1
+
     if utr_or_enhance == 'UTR':
         name_file = '3UTR'
         path2 = '/Users/bilvikakasturi/PycharmProjects/pythonProject1/MPRA/hg38.ensGene.3UTR.gtf.bed'
@@ -378,8 +407,8 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
         name_file = 'enh'
         path2 = '/Users/bilvikakasturi/PycharmProjects/pythonProject1/MPRA/GRCh38-ELS.bed'
         gr3 = pr.read_bed(path2)
-    f_gtf=0
-    f_bed=0
+    f_gtf = 0
+    f_bed = 0
 
     if chkUTR:
         f_gtf = request.files['filegtfbed']
@@ -397,23 +426,30 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
         f_bed.save(secure_filename(f_bed.filename))
         path2 = file_name_bed
         gr3 = pr.read_bed(path2)
+
     # segment_all_vcf = 'bedtools intersect -header -a SNP_LD.bed -b '+path2+' > intersect.bed'
     # os.system(segment_all_vcf)
     # gr3 = pr.read_bed(path2)
     def intersect_gz():
         path = '/Users/bilvikakasturi/PycharmProjects/pythonProject1/MPRA/SNP_LD.bed'
         gr = pr.read_bed(path)
-        gr4 = gr.intersect(gr3)
-        gr4.to_csv('intersect.bed', sep='\t')
+        grinn = gr.intersect(gr3)
+        # gr4.to_csv('intersect.bed', sep='\t')
+        return grinn
 
-    intersect_gz()
+    grintersect = intersect_gz()
+    grintersect.to_csv('intersect.bed', sep='\t')
     intersect_path = 'intersect.bed'
-    if os.stat(intersect_path).st_size == 0:
+    if os.stat(intersect_path).st_size == 0 or (not grintersect):
         logging.info(
-            "Intersection of the files with GRCh38-ELS.bed for enhancer or hg38.ensGene.3UTR.gtf.bed for UTR is not sucessfull")
+            "Intersection of the files with GRCh38-ELS.bed for enhancer or hg38.ensGene.3UTR.gtf.bed for UTR is not "
+            "sucessful")
+        SudZipWrite()
+        return
     else:
         logging.info(
-            "Intersection of the files with GRCh38-ELS.bed for enhancer or hg38.ensGene.3UTR.gtf.bed for UTR bed files creation is sucessfull")
+            "Intersection of the files with GRCh38-ELS.bed for enhancer or hg38.ensGene.3UTR.gtf.bed for UTR bed "
+            "files creation is sucessfull")
     df = pd.read_csv('intersect.bed', sep='\t')
     unique_chromosomes = df.Chromosome.unique()
 
@@ -449,6 +485,8 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
         vcf_files = 'CUD_1000g_all.vcf'
         if os.stat(vcf_files).st_size == 0:
             logging.info("VCF files not created error in bed files")
+            SudZipWrite()
+            return
         else:
             logging.info("VCF files created succesfully ")
 
@@ -494,9 +532,8 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
     #     x_df['AF_AMR'].between(X, 1-X)) | (x_df['AF_SAS'].between(X, 1-X)) | (x_df['AF_AFR'].between(X, 1-X))]
     cud_u3_max.to_csv('cud_u3_maf_uniq.txt.gz', index=None, sep='\t')  # verify if this file is needed
     if cud_u3_max.empty:
-        with ZipFile("SUD_files.zip", "w") as newzip:
-            logging.info('values which lie between the AF is null so no files generated!!!')
-            newzip.write('log.txt')
+        logging.info('values which lie between the AF is null so no files generated!!!')
+        SudZipWrite()
         return
     after_truevalue = datetime.now()
     after_time = after_truevalue.strftime("%H:%M:%S")
@@ -647,7 +684,8 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
     new_dataframe_seq = oligos_AF
     new_dataframe_seq = new_dataframe_seq.drop(['ref_sequence', 'alt_sequence'], axis=1)
     new_dataframe_seq.to_csv('SUD_' + name_file + '_oligos_p1_p2.txt', index=None, sep='\t')
-    new_dataframe_seq = new_dataframe_seq.drop(['AF_EUR', 'AF_EAS', 'AF_AMR', 'AF_SAS', 'AF_AFR','gREF', 'gALT', 'oREF', 'oALT'], axis=1)
+    new_dataframe_seq = new_dataframe_seq.drop(
+        ['AF_EUR', 'AF_EAS', 'AF_AMR', 'AF_SAS', 'AF_AFR', 'gREF', 'gALT', 'oREF', 'oALT'], axis=1)
 
     sud_u3_oligoinfo = pd.melt(new_dataframe_seq, id_vars=["Name"],
                                var_name="SEQ_Behavior", value_name="SEQUENCE")
@@ -687,6 +725,11 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X,flag=0):
     time_2 = datetime.strptime(after_time, "%H:%M:%S")
     time_interval = time_2 - time_1
     print(time_interval)
+
+
+def SudZipWrite():
+    with ZipFile("SUD_files.zip", "w") as newzip:
+        newzip.write('log.txt')
 
 
 if __name__ == '__main__':
