@@ -5,10 +5,7 @@ import numpy as np
 import pyranges as pr
 import gzip
 from Bio.Seq import Seq
-import operator
-import random
 from datetime import datetime
-import flask
 import logging
 
 from biomart import BiomartServer
@@ -41,19 +38,12 @@ def upload_file():
             f.save(secure_filename(f.filename))
         global utr_enh
         utr_enh = request.form.get("utr_enh")
-        # with open(file_name, "r") as data:
-        #     content = data.read()
-        #     print(content)
 
         true_value = request.form.get("true_value")
         X = request.form.get("X")
-
-        # logging.basicConfig(filename="log.txt")
-
         should_roll_over = os.path.isfile('log.txt')
 
-        # handler = logging.handlers.RotatingFileHandler('log.txt', mode='w')
-        if should_roll_over:  # log already exists, roll over!
+        if should_roll_over:  # if log already exists, roll over!
             with open("log.txt", 'w') as file:
                 file.write('readme')
                 file.write('\n')
@@ -183,6 +173,7 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
             # if file has 4 columns with rsids column SNP
             # data_1 = pd.read_csv('rsids.txt',header=None, sep=' ')#if file type is only rsids
             data_1.drop_duplicates()
+            data_1 = data_1.dropna(axis=1)
             # data_1.columns=['SNP']
             data_1[0] = data_1[0].str.strip()
             unique_snp = data_1[0].unique()
@@ -190,9 +181,11 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
                 data_rsid_list = [item.split(',') for item in data_rsid]
                 data_rsid_flat = [item for l in data_rsid_list for item in l]
                 unique_snp = np.concatenate((unique_snp, data_rsid_flat))
+            unique_snp = unique_snp.tolist()
         else:
             unique_snp = data_rsid
         filename = "LD_EUR.tsv.gz"
+
         with gzip.open(filename, 'rt') as f:
             f.readline()
             for line in f:
@@ -279,24 +272,18 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
         unique_vals = onlyrsids[~onlyrsids.SNP.isin(first_4_columns.SNP)].append(
             first_4_columns[~first_4_columns.SNP.isin(onlyrsids.SNP)],
             ignore_index=True)['SNP'].to_list()
-        response = hsapiens.search({
-            'filters': {'snp_synonym_filter': unique_vals},
-            'attributes': ['chr_name', 'chrom_start', 'chrom_end', 'synonym_name']
-        })
-        # 'synonym_name',
-        llist = []
-        for line in response.iter_lines():
-            x = (line.decode())
-            llist.append(x.split())
-        print(llist)
-        biomart_op = pd.DataFrame(llist,
-                                  columns=['CHR', 'min_range', 'max_range', 'SNP'])
-        print(biomart_op)
+        biomart_op = biomart_Synonumvariant(hsapiens, unique_vals, 'snp_synonym_filter')
+        # to check how many snp's returned
+        synonym_filter = biomart_op['SNP'].to_list()
+        list_snp_selection = list(set(synonym_filter).symmetric_difference(set(unique_vals)))
+        if list_snp_selection:
+            biomart_op1 = biomart_Synonumvariant(hsapiens, list_snp_selection, 'snp_filter')
+            biomart_op = biomart_op.append(biomart_op1, ignore_index=True)
         biomart_snp = biomart_op.groupby('SNP').agg(
             {'CHR': 'min', 'min_range': 'min', 'max_range': 'max'}).reset_index()
         biomart_snp['CHR'] = 'chr' + biomart_op['CHR'].astype(str)
         biomart_snp = biomart_snp[['CHR', 'min_range', 'max_range', 'SNP']]
-        print(biomart_snp)
+
         new_4_rsids = first_4_columns.append(biomart_snp, ignore_index=True)
         new_4_rsids = new_4_rsids.astype({'min_range': 'int', 'max_range': 'int'})
         i = (new_4_rsids[new_4_rsids.CHR.str.contains(r'[_]')]).index
@@ -305,15 +292,15 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
         opt_rsids.columns = ['lead_SNP', 'SNP']
         new_df = opt_rsids
         new_df['new_column'] = new_df['lead_SNP'] + ',' + new_df['SNP']
-        min_range_list = []
+        # min_range_list = []
         failed_list = []
         every_line_list = []
-        every_char_list = []
+        # every_char_list = []
         chr_range_lis = []
         new_chr_list = []
         chr_count_list = []
         every_line_list_max = []
-        chr_count_list_key = []
+        # chr_count_list_key = []
         f = []
 
         def extr_Chr_min_max(Differ):
@@ -331,8 +318,8 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
 
                     main_min_range = 'empty'
                     main_max_range = 'empty'
-                print(main_min_range)
-                print(main_max_range)
+                # print(main_min_range)
+                # print(main_max_range)
                 assign_min_max_chr(f, maximum_range_list, minimum_range_list, val)
 
                 chr_range_lis.append(f)
@@ -375,13 +362,23 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
                     chr_range = new_4_rsids['CHR'].loc[new_4_rsids['SNP'] == s1].values.tolist()[0]
 
                 except Exception as x:
-
-                    failed_list.append(s1)
+                    if s1:
+                        failed_list.append(s1)
                 minimum_range_list.append(minimum_range)
                 maximum_range_list.append(maximum_range)
 
                 f.append(chr_range)
+        print("The list is",failed_list)
 
+        failed_lit = pd.DataFrame(failed_list)
+        failed_lit.to_csv('testingfailed.txt')
+        failed_lit = failed_lit.dropna(axis=1)
+        print("The dataframe of failed list is",failed_lit)
+        if not failed_lit[failed_lit.isin([0])].empty:
+            if flag == 1:
+                failed_lit.to_csv('failedSNPListUTR.txt')
+            else:
+                failed_lit.to_csv('failedSNPList.txt')
         for key, value in new_df.iteritems():
             if key == 'new_column':
                 extr_Chr_min_max(Differ)
@@ -416,7 +413,6 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
         f_bed = request.files['filebed']
 
     if f_gtf:
-        # file_name_gtf = ''
         file_name_gtf = f_gtf.filename
         f_gtf.save(secure_filename(f_gtf.filename))
         path2 = file_name_gtf
@@ -443,7 +439,7 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
     if os.stat(intersect_path).st_size == 0 or (not grintersect):
         logging.info(
             "Intersection of the files with GRCh38-ELS.bed for enhancer or hg38.ensGene.3UTR.gtf.bed for UTR is not "
-            "sucessful")
+            "successful")
         SudZipWrite()
         return
     else:
@@ -700,12 +696,21 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
     # logging.warning("The program may not function properly")
     # logging.error("The program encountered an error")
     # logging.critical("The program crashed")
+    if os.path.exists("failedSNPList.txt"):
+        logging.info("There are few rs SNIP's which did not return any values, Please find them in failedSNPList.txt "
+                     "file in ZIP File.")
+        failed_exists = True
+    else:
+        failed_exists = False
+
     if flag == 1:
         with ZipFile("SUD_files.zip", "a") as newzip:
             newzip.write('sud_' + name_file + '_oligoinfo_p1_p2.txt')
             newzip.write('SUD_' + name_file + '_oligos_p1_p2.txt')
             newzip.write('SUD_' + name_file + '_oligos.txt')
             newzip.write('sud_' + name_file + '_oligoinfo.txt')
+            if failed_exists:
+                newzip.write('failedSNPListUTR.txt')
             newzip.write('log.txt')
             newzip.write('chr_sign_geneid.txt')
         return
@@ -714,6 +719,8 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
         newzip.write('SUD_' + name_file + '_oligos_p1_p2.txt')
         newzip.write('SUD_' + name_file + '_oligos.txt')
         newzip.write('sud_' + name_file + '_oligoinfo.txt')
+        if failed_exists:
+            newzip.write('failedSNPList.txt')
         if not utr_or_enhance == 'BothUE':
             newzip.write('log.txt')
         if name_file == '3UTR':
@@ -725,6 +732,26 @@ def snp_select_itr_enh(file_name, utr_or_enhance, true_value, X, flag=0):
     time_2 = datetime.strptime(after_time, "%H:%M:%S")
     time_interval = time_2 - time_1
     print(time_interval)
+
+
+def biomart_Synonumvariant(hsapiens, unique_vals, passed_filter):
+    global x
+    chunks = [unique_vals[x:x + 500] for x in range(0, len(unique_vals), 500)]
+    tlist = []
+    for x in chunks:
+        response = hsapiens.search({
+            'filters': {passed_filter: x},
+            'attributes': ['chr_name', 'chrom_start', 'chrom_end', 'synonym_name']
+        })
+        # 'synonym_name',
+        llist = []
+        for line in response.iter_lines():
+            x = (line.decode())
+            llist.append(x.split())
+        tlist = tlist + llist
+    biomart_op = pd.DataFrame(tlist,
+                              columns=['CHR', 'min_range', 'max_range', 'SNP'])
+    return biomart_op
 
 
 def SudZipWrite():
