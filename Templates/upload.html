@@ -1,0 +1,457 @@
+<!-- <script src="http://code.jquery.com/jquery-1.11.3.min.js"></script> -->
+<!-- <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> -->
+<!DOCTYPE html>
+<html>
+  <head>
+<link rel=”stylesheet” href=”https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css”rel=”nofollow” integrity=”sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm” crossorigin=”anonymous”>
+<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+<style>
+	table, th, td {
+	  border: 1px solid black;
+	  border-collapse: collapse;
+    padding: 6px;
+	}
+	h3 {
+		font-family: Verdana, Arial, Helvetica, sans-serif;
+		font-size: 23px;
+		color: #000000;
+		text-align: left;
+	}
+  .disable-div {
+    pointer-events: none;
+}
+	.help-tip{
+	    position: absolute;
+	    top: 18px;
+	    right: 18px;
+	    text-align: center;
+	    background-color: #BCDBEA;
+	    border-radius: 50%;
+	    width: 24px;
+	    height: 24px;
+	    font-size: 14px;
+	    line-height: 26px;
+	    cursor: default;
+	}
+
+	.help-tip:before{
+	    content:'?';
+	    font-weight: bold;
+	    color:#fff;
+	}
+
+	.help-tip:hover p{
+	    display:block;
+	    transform-origin: 100% 0%;
+
+	    -webkit-animation: fadeIn 0.3s ease-in-out;
+	    animation: fadeIn 0.3s ease-in-out;
+
+	}
+
+	.help-tip p{    /* The tooltip */
+	    display: none;
+	    text-align: left;
+	    background-color: #1E2021;
+	    padding: 20px;
+	    width: 300px;
+	    position: absolute;
+	    border-radius: 3px;
+	    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+	    right: -4px;
+	    color: #FFF;
+	    font-size: 13px;
+	    line-height: 1.4;
+	}
+
+	.help-tip p:before{ /* The pointer of the tooltip */
+	    position: absolute;
+	    content: '';
+	    width:0;
+	    height: 0;
+	    border:6px solid transparent;
+	    border-bottom-color:#1E2021;
+	    right:10px;
+	    top:-12px;
+	}
+
+	.help-tip p:after{ /* Prevents the tooltip from being hidden */
+	    width:100%;
+	    height:40px;
+	    content:'';
+	    position: absolute;
+	    top:-40px;
+	    left:0;
+	}
+
+	/* CSS animation */
+
+	@-webkit-keyframes fadeIn {
+	    0% {
+	        opacity:0;
+	        transform: scale(0.6);
+	    }
+
+	    100% {
+	        opacity:100%;
+	        transform: scale(1);
+	    }
+	}
+
+	@keyframes fadeIn {
+	    0% { opacity:0; }
+	    100% { opacity:100%; }
+	}</style>
+</head>
+<body>
+ <h3>Candidate SNP selection for Massively Parallel Reporter Assays</h3>
+<form action = "http://localhost:5000/uploader" method = "POST"
+	 enctype = "multipart/form-data" onSubmit="return formValidation()">
+	 <table style="width:45%">
+
+			 <tr>
+    <th>Lead SNP's</th>
+    <th>INPUT</th>
+  </tr>
+	 <tr><td><label id="fileidName" for="fileName">Upload file of rsIDs:</label>
+	 <a target="_blank"  title="Lead SNP file format: list of rsIDs separated by a new line"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+	 <td><input id="fileName" type = "file" name = "file" />
+	 <!-- &nbsp; or  &nbsp;&nbsp; -->
+ </td></tr><tr>
+
+	 <td><label for="RSID">OR enter rsIDs to text box:</label>
+	 <a target="_blank"  title="Enter list of rsIDs to text box, separating each with a new line"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+
+	 <td><textarea id="RSID" name="RSID" rows="1.5" cols="15"></textarea></td></tr>
+	 </table><br><br>
+   <!-- <table style="width:45%">
+     <tr>
+  <th>LD Region Options</th>
+
+  <tr><td><label for="limit_LD">Limit LD region size?</label>
+<a target="_blank"  title="If selected, the size of the LD region is limited to the inputted value"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><select name="limit_LD" id="limit_LD" placeholder="limit_LD"
+onchange="showHideDiff(this.value);">
+  <option value="Select">select</option>
+  <option value="YES">YES</option>
+  <option value="NO">NO</option>
+</select></td></tr>
+<tr id="Difference_value">
+  <td><label for="Differ">Maximum distance from lead SNP:</label>
+  <a target="_blank" title="Maximum distance the candidate SNPs should be from the Lead SNP​"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+  <td><input id="Differ" type = "number" min="0" name = "Differ" /></td></tr>
+</table><br><br> -->
+
+	 <table style="width:45%">
+     <tr>
+  <th>Candidate SNP requirements</th>
+  <tr><td><label for="r2">LD Region r&sup2 threshold</label>
+  <a target="_blank"  title="Minimum r&sup2 value"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+
+  <td><input id="r2" title="Minimum r&sup2 value" type = "number" min="0" max="1" step="0.1" value="0.8" name = "r2" ></td></tr>
+ </tr>
+<tr><td>
+	 <label for="X">Minimum minor allele frequency:</label>
+	 <a target="_blank"  title="Minimum minor allele frequency threshold to use for selecting candidate SNPs"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+
+	<td> <input id="X" type = "number" min="0" max="1" step="0.01" value="0.05" name = "X" ></td></tr>
+	 	 <tr><td><label for="choose_check_numeber">MAF Population requirements?</label>
+	 <a target="_blank"  title="Number of populations: candidate SNPs are selected when at least this number of populations have MAF meeting the threshold value​
+Select populations: candidate SNPs must meet the threshold MAF value in the selected specific populations"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+	 <td><select name="choose_check_numeber" id="choose_check_numeber" placeholder="choose_check_numeber"
+	 onchange="showHide(this.value);">
+		 <option value="Select">select</option>
+		 <option value="Number">Number of populations</option>
+		 <option value="Checkbox">Select populations</option>
+	 </select></td></tr>
+   <tr id="true-number" >
+  <td>
+	 <label for="true_value">Number of populations:</label>
+	 <a target="_blank"  title="Provide number for AF count"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+	 <td><select name="true_value" id="true_value" placeholder="true_value">
+		 <option value="Select">select</option>
+		 <option value="1">1</option>
+		 <option value="2">2</option>
+		 <option value="3">3</option>
+		 <option value="4">4</option>
+		 <option value="5">5</option>
+		 <option value="6">6</option>
+	 </select>
+	 </td></tr>
+	 <tr id="check-box" ><td>
+     <label for="check_vallue">Select populations:</label>
+  	 <a target="_blank"  title="Select populations"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+
+     <td>
+	 <input type="checkbox"  placeholder='checkinfo[]' name='chk1' id="chk1"value="AF_EUR"> AF_EUR
+	 <input type="checkbox" placeholder='checkinfo[]' name='chk2'id="chk2"value="AF_EAS"> AF_EAS
+	 <input type="checkbox" placeholder='checkinfo[]' name='chk3'id="chk3"value="AF_AMR"> AF_AMR
+	 <input type="checkbox" placeholder='checkinfo[]' name='chk4'id="chk4"value="AF_SAS"> AF_SAS
+	 <input type="checkbox" placeholder='checkinfo[]' name='chk5'id="chk5"value="AF_AFR"> AF_AFR
+	 </td></tr>
+	 <tr><td><label for="utr_enh">Candidate SNP types</label>
+	 <a target="_blank"  title="Select 3’-UTR/Enhancer/Both"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+	 <td><select name="utr_enh" id="utr_enh" name="utr_enh" placeholder="utr_enh">
+		 <option value="Select">select</option>
+		 <option value="UTR">UTR</option>
+		 <option value="Enhancer">ENHANCER</option>
+     <option value="BothUE">UTR & ENHANCER</option>
+	 </select></td></tr>
+
+
+</table><br>
+<div id="file-input-UTR" style="display:none;">
+<table style="width:45%">
+  <tbody>
+    <tr>
+ <th>3’-UTR SNPs </th>
+ <!-- <th>Header2</th> -->
+</tr>
+<tr><td>
+<label id=labelfileutr for="filegtfbed">3’-UTR Annotation File (GTF)</label>
+<a target="_blank" title="Annotation (using hg38) for 3’-UTR (default is Ensembl)"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="filegtfbed" type = "file" name = "filegtfbed" />  </td></tr>
+<tr><td><label for="flank">Bases to include on each side of the variant</label>
+<a target="_blank" title="Number of flanking bases on each side of the variant to include (default is 25, for 51 bp total)"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="flank" type = "number" min="0" value="25" max="200" step="1"  name = "flank" /></td></tr>
+<tr><td><label for="Differ">Maximum distance from lead SNP:</label>
+<a target="_blank" title="Maximum distance the candidate SNPs should be from the Lead SNP​"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="Differ" type = "number" min="0" name = "Differ" /></td></tr>
+<tr><td><label for="p1">Leading primer sequence</label>
+<a target="_blank" title="Sequence to prepend on the 5’ end of the oligo"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="p1" type = "text"  value="CCGTGTAATTCTAGGAGCTC" name = "p1" /></td></tr>
+<tr><td><label for="p2">Trailing primer sequence</label>
+<a target="_blank" title="Sequence to append on the 3’ end of the oligo"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="p2" type = "text"  value="CGTTCTAGAGTCGGGGCGG" name = "p2" /></td></tr></tbody></table ></div>
+<div id="UTR-chk"style="display:none;">
+<table style="width:45%" >
+<tr><td><label>
+<input type="checkbox" id="UTRchk" name="chkUTR">[Use custom options]
+<a target="_blank"  title="Want to customise Parameters for UTR?"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a>
+</label></td></tr>
+</table><br><br></div>
+
+
+<div id="file-input-ENHANCER" style="display:none;">
+<table style="width:45%">
+  <tbody>
+    <tr>
+ <th>Enhancer SNPs </th>
+ <!-- <th>Header2</th> -->
+</tr>
+<tr><td>
+<label id=labelfileue for="filebed">Enhancer annotation file (bed)</label>
+<a target="_blank" title="Annotation (using hg38) for enhancer regions (default is from SCREEN)"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="filebed" type = "file" name = "filebed" />  </td></tr>
+<tr><td><label for="flankEnh">Bases to include on each side of the variant</label>
+<a target="_blank" title="Number of flanking bases on each side of the variant to include (default is 66, for 133 bp total)"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="flankEnh" type = "number" value="66"min="0" max="200" step="1"  name = "flankEnh" /></td></tr>
+<tr><td><label for="DifferEnh">Maximum distance from lead SNP:</label>
+<a target="_blank" title="Maximum distance the candidate SNPs should be from the Lead SNP​"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="DifferEnh" type = "number" min="0" name = "DifferEnh" /></td></tr>
+<tr><td><label for="p1Enh">Leading primer sequence</label>
+<a target="_blank" title="Sequence to prepend on the 5’ end of the oligo"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="p1Enh" type = "text" value="ATCTAGAGCATGCACCGG"  name = "p1Enh" /></td></tr>
+<tr><td><label for="p2Enh">Trailing primer sequence</label>
+<a target="_blank" title="Sequence to append on the 3’ end of the oligo"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a></td>
+<td><input id="p2Enh" type = "text" value="TCGACGAATTCGGCCGGC"  name = "p2Enh" /></td></tr></tbody></table ></div>
+<div id="Enh-chk"style="display:none;">
+<table style="width:45%" >
+<tr><td><label>
+<input type="checkbox" id="Enhchk" name="chkENH">[Use custom options]
+<a target="_blank"  title="Want to customise Parameters for Enhancer?"><img src="https://shots.jotform.com/kade/Screenshots/blue_question_mark.png" height="13px"/></a>
+</label></td></tr>
+</table><br><br></div>
+
+
+
+ <input type="submit" name="anything_submit" value="Submit"/>
+</form><br>
+<button  id="buttonclick" disabled>Click for status</button>
+<div id="submitbutton"></div>
+
+</body>
+
+
+   <!-- <body>
+     <p id="submitbutton"></p>
+   </body> -->
+
+
+</html>
+<script type="text/javascript">
+// 					var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+// var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+//   return new bootstrap.Tooltip(tooltipTriggerEl);
+// });
+        $('tr#true-number').hide();
+        $('tr#Difference_value').hide();
+        $('tr#check-box').hide();
+        var true_number_div=document.getElementById("true-number");
+				true_number_div.disabled=true;
+        var all = document.querySelectorAll("#file-input-UTR select, #file-input-UTR input, #file-input-UTR textarea");
+        var allEnh = document.querySelectorAll("#file-input-ENHANCER select, #file-input-ENHANCER input, #file-input-ENHANCER textarea");
+
+        for (let el of all) { el.disabled = true; }
+        for (let el of allEnh) { el.disabled = true; }
+
+        function buttonclickenable() {
+     $('#buttonclick').prop('disabled', false);
+}
+document.getElementById('UTRchk').onchange = function(){
+   if(this.checked) {
+     // document.getElementById('file-input-UTR').style.display='block';
+   for (let el of all) { el.disabled = false;}
+   }
+   else {document.getElementById('file-input-UTR').disabled=true;
+        document.getElementById("flank").value="25"
+        document.getElementById("p1").value="CCGTGTAATTCTAGGAGCTC"
+        document.getElementById("p2").value="CGTTCTAGAGTCGGGGCGG"
+        document.getElementById("Differ").value=""
+   for (let el of all) { el.disabled = true; }
+   }
+ };
+ document.getElementById('Enhchk').onchange = function(){
+    if(this.checked) {
+      // document.getElementById('file-input-UTR').style.display='block';
+    for (let el of allEnh) { el.disabled = false;}
+    }
+    else {document.getElementById('file-input-ENHANCER').disabled=true;
+    document.getElementById("flankEnh").value="66"
+    document.getElementById("p1Enh").value="ATCTAGAGCATGCACCGG"
+    document.getElementById("p2Enh").value="TCGACGAATTCGGCCGGC"
+    // document.getElementById("DifferEnh").value=""
+    for (let el of allEnh) { el.disabled = true; }
+    }
+  };
+        // src="{{ url_for('stream') }}"
+        $(function(){
+      $('#buttonclick').click(function(){
+          // if(!$('#iframe1').length) {
+                  $('#submitbutton').html(`<iframe id="iframe1"  src="{{ url_for('stream') }}" frameborder="0" style="overflow:hidden;width:100%" width="100%" frameborder="0" scrolling="no" onload="resizeIframe(this)"> </iframe>`);
+          // // }
+          // $('#submitbutton').html('<b>Test</b>');
+  // }
+      });
+  });
+  $(document).ready(function(){
+
+    $('#utr_enh').change(
+        function () {
+            var method = $('option:selected', this).text();
+            if (method == "UTR") {
+                document.getElementById('file-input-UTR').style.display='block';
+                document.getElementById('file-input-ENHANCER').style.display='none';
+                document.getElementById('UTR-chk').style.display='block';
+                document.getElementById('Enh-chk').style.display='none';
+
+            } else if (method == "ENHANCER") {
+                document.getElementById('file-input-ENHANCER').style.display='block';
+                document.getElementById('file-input-UTR').style.display='none';
+                document.getElementById('Enh-chk').style.display='block';
+                document.getElementById('UTR-chk').style.display='none';
+            }
+            else if(method == "UTR & ENHANCER"){
+              document.getElementById('file-input-ENHANCER').style.display='block';
+              document.getElementById('file-input-UTR').style.display='block';
+              document.getElementById('UTR-chk').style.display='block';
+              document.getElementById('Enh-chk').style.display='block';
+            }
+            else{
+              document.getElementById('file-input-ENHANCER').style.display='none';
+              document.getElementById('file-input-UTR').style.display='none';
+              document.getElementById('UTR-chk').style.display='none';
+              document.getElementById('Enh-chk').style.display='none';
+            }
+        });
+ });
+        function resizeIframe(obj) {
+          obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
+        }
+        function showHide(value) {
+    if (value=='Number'){
+        $('tr#true-number').show();
+        // document.getElementById('true-number').style.display = 'block';
+        $('tr#check-box').hide();}
+          // document.getElementById('check-box').style.display = 'none';}
+    else if (value=='Checkbox'){
+        $('tr#true-number').hide();
+        $('tr#check-box').show();}
+        // document.getElementById('check-box').style.display = 'block';
+          // document.getElementById('true-number').style.display = 'none';}
+
+        else{
+          $('tr#true-number').hide();
+          $('tr#check-box').hide();
+
+            // document.getElementById('check-box').style.display = 'none';
+            // document.getElementById('true-number').style.display = 'none';
+        }
+}
+function showHideDiff(value) {
+if (value=='YES'){
+$('tr#Difference_value').show();}
+
+else{
+
+  $('tr#Difference_value').hide();
+
+}
+}
+
+        function formValidation()
+        {
+            var check_length=$('input[placeholder="checkinfo[]"]:checked').length;
+            var textareaval=document.getElementById("RSID").value;
+            if(document.getElementById("fileName").value==""  &&  textareaval=="")
+            {
+                alert("file or RSID text not provided ");
+
+            return false;
+            }
+
+            else if (document.getElementById("X").value>=1 || document.getElementById("X").value<=0) {
+              alert("Value should be between 0 and 1");
+
+          return false;
+            }
+            else if (document.getElementById("X").value.length<1 ) {
+              alert("Text box is empty!!Enter value between 0 and 1");
+
+          return false;
+            }
+            else if (document.getElementById("choose_check_numeber").value=="Select" ) {
+              alert("Number/checkbox not selected not selected ");
+
+          return false;
+            }
+            else if (document.getElementById("true_value").value=="Select" && document.getElementById("choose_check_numeber").value=="Number") {
+              alert("Number not selected ");
+
+          return false;
+            }
+            else if (check_length==0&& document.getElementById("choose_check_numeber").value=="Checkbox") {
+              alert("Please select atleast one checkbox");
+          return false;
+            }
+            else if (document.getElementById("true_value").value!="Select" && check_length>0) {
+              alert("Only checkbox or number value can be given not both");
+
+          return false;
+            }
+            else if (document.getElementById("utr_enh").value=="Select") {
+              alert("UTR/ENHANCER Dropdown is not selected ");
+
+          return false;
+            }
+            else {
+              const button = document.querySelector('buttonclick');
+              // document.getElementById('submitbutton').innerHTML = "Process started...";
+              buttonclickenable();
+
+              return true;
+            }
+            }
+
+// ]]></script>
